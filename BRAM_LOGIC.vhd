@@ -79,7 +79,7 @@ Port (
 end BRAM_LOGIC;
 
 architecture Behavioral of BRAM_LOGIC is
-type state is (IDLE, LOAD_BRAMS, RESET_CHARACTER_REGS, PROCESSING, Z_LOOP, GET_STRING_WIDTH_1, GET_STRING_WIDTH_2, CURRENT_Y_X, K_LOOP, K_LOOP_2, I_LOOP, J_LOOP);
+type state is (IDLE, LOAD_BRAMS, RESET_CHARACTER_REGS, PROCESSING, Z_LOOP, GET_STRING_WIDTH_1, GET_STRING_WIDTH_2, CURRENT_Y_X, K_LOOP, K_LOOP_2, I_LOOP, J_LOOP, J_LOOP2, J_LOOP3);
 signal state_reg, state_next: state;
 signal addr_reg, addr_next: std_logic_vector(PHOTO_ADDR_SIZE - 1  downto 0); 
 signal frame_height_reg, frame_height_next, frame_width_reg, frame_width_next: std_logic_vector(10 downto 0);
@@ -110,7 +110,7 @@ signal currX_reg, currX_next: std_logic_vector(10 downto 0);
 signal currY_reg, currY_next: std_logic_vector(10 downto 0);
 
 signal tmp_currX: std_logic_vector(10 downto 0);
-signal tmp_y: std_logic_vector(LETTER_DATA_RAM_WIDTH - 1 downto 0);
+
 
 signal letterWidth_reg, letterWidth_next: std_logic_vector(7 downto 0);
 signal letterHeight_reg, letterHeight_next: std_logic_vector(7 downto 0);
@@ -199,7 +199,7 @@ end process;
 
 process(state_reg, addr_reg, command, frame_width_reg, frame_height_reg, bram_row_reg, axis_s_valid, axis_s_last, axis_s_data_in, number_character_reg, number_rows_reg, 
 number_character_row1_reg, number_character_row2_reg, number_character_row3_reg, number_character_row4_reg, number_rows_next, spacing_reg, y_reg, endCol_reg, endCol_next, startCol_reg, z_reg, z_next, tmp1_s, tmp2_s, start_reg, end_reg, start_next, possition_y, 
-k_reg, k_next, width_reg, currX_reg, currY_reg, currY_next, tmp_currX, tmp_y, data_text_in, data_letterData_in1,data_letterData_in2, letterWidth_reg,letterWidth_next, letterHeight_reg, letterHeight_next, ascii_reg, ascii_next, startPos_reg,tmp_currY_reg,tmp_currY_next, startY_reg, endY_reg,i_reg, i_next, j_reg, j_next)
+k_reg, k_next, width_reg,width_next, currX_reg, currY_reg, currY_next, tmp_currX, data_text_in, data_letterData_in1,data_letterData_in2, letterWidth_reg,letterWidth_next, letterHeight_reg, letterHeight_next, ascii_reg, ascii_next, startPos_reg,tmp_currY_reg,tmp_currY_next, startY_reg, endY_reg,i_reg, i_next, j_reg, j_next)
 begin
     ready <= '0';
     axis_s_ready <= '0';
@@ -258,7 +258,7 @@ begin
     tmp1_s <= (others => '0');
     tmp2_s <= (others => '0');
     tmp_currX <= (others => '0');
-    tmp_y <= (others => '0');
+    
     
     letterWidth_next <= letterWidth_reg;
     letterHeight_next <= letterHeight_reg;
@@ -436,8 +436,8 @@ begin
             tmp_currX <= std_logic_vector(unsigned(frame_width_reg) - unsigned(width_reg));
             currX_next <= '0' & tmp_currX(10 downto 1);
             --moze sift u jednom taktu, izmeniti, ne mora poseban signal
-            tmp_y <= '0' & y_reg(LETTER_DATA_RAM_WIDTH - 1 downto 1);
-            currY_next <= std_logic_vector(unsigned(z_reg) * unsigned(y_reg) + unsigned(tmp_y));
+            
+            currY_next <= std_logic_vector(unsigned(z_reg) * unsigned(y_reg) + unsigned('0' & y_reg(LETTER_DATA_RAM_WIDTH - 1 downto 1)));
             
             if(currY_next >= endCol_reg) then
                 z_next <= std_logic_vector(unsigned(z_reg) + TO_UNSIGNED(1, 3));
@@ -462,7 +462,7 @@ begin
             
         when K_LOOP =>
             ascii_next <= data_text_in;
-            addr_possition_read <= ascii_next;
+            addr_possition_read <= ascii_next(6 downto 0);
             en_possition <= '1';
             addr_letterData_read1 <= ascii_next(TEXT_RAM_WIDTH - 2 downto 0) & '0';
             addr_letterData_read2 <= std_logic_vector(unsigned(ascii_next(TEXT_RAM_WIDTH - 2 downto 0) & '0') + to_unsigned(1,TEXT_RAM_WIDTH));            
@@ -476,27 +476,31 @@ begin
             letterWidth_next <= data_letterData_in1;
             letterHeight_next <= data_letterData_in2;
             if(unsigned(ascii_reg) = to_unsigned(71,8) or unsigned(ascii_reg) = to_unsigned(74,8) or unsigned(ascii_reg) = to_unsigned(80,8) or unsigned(ascii_reg) = to_unsigned(81,8) or unsigned(ascii_reg) = to_unsigned(89,8)) then
-                tmp_currY_next <= std_logic_vector(to_signed(TO_INTEGER(unsigned(currY_reg)) - TO_INTEGER(unsigned("00" & letterHeight_next(7 downto 2))),11));
+                tmp_currY_next <= std_logic_vector((unsigned(currY_reg)) - unsigned("00" & letterHeight_next(7 downto 2)));
             else
                 tmp_currY_next <= currY_reg;
             end if;
-            if(unsigned(ascii_reg) <= to_unsigned(106, 8)) then
+            
+            if(unsigned(ascii_reg) >= to_unsigned(106, 8)) then
                 ascii_next <= std_logic_vector(to_unsigned(31,8));
             else
                 ascii_next <= ascii_reg;
             end if;
-            startY_next <= (others  => '0');
-            endY_next <= letterHeight_next;
+            
             state_next <= I_LOOP;
+            width_next <= std_logic_vector(unsigned(tmp_currY_next) + unsigned(letterHeight_next));
             
             --ISPOD OPERACIJE POGLEDATI NA KOJI NACIN MOGU DA SE UPROSTE
-            if(TO_INTEGER(signed(tmp_currY_next)) < TO_INTEGER(to_signed(0, 11))) then
-                if(TO_INTEGER(signed(tmp_currY_next)) + TO_INTEGER(unsigned(letterHeight_next)) > TO_INTEGER(unsigned(startCol_reg)) and TO_INTEGER(signed(tmp_currY_next)) + TO_INTEGER(unsigned(letterHeight_next)) <= TO_INTEGER(unsigned(endCol_reg))) then
-                    endY_next <= std_logic_vector(to_unsigned(TO_INTEGER(signed(tmp_currY_next)) + TO_INTEGER(unsigned(letterHeight_next)) - TO_INTEGER(unsigned(startCol_reg)),11));
-                elsif(TO_INTEGER(signed(tmp_currY_next)) + TO_INTEGER(unsigned(letterHeight_next)) > TO_INTEGER(unsigned(endCol_reg))) then
-                    startY_next <= std_logic_vector(to_unsigned(TO_INTEGER(signed(tmp_currY_next)) + TO_INTEGER(unsigned(letterHeight_next)) - TO_INTEGER(unsigned(endCol_reg)),11));
-                    endY_next <= std_logic_vector(to_unsigned(TO_INTEGER(signed(tmp_currY_next)) + TO_INTEGER(unsigned(letterHeight_next)) - TO_INTEGER(unsigned(startCol_reg)),11));
+            if(unsigned(tmp_currY_next) < unsigned(startCol_reg)) then
+                if(unsigned(width_next) > unsigned(startCol_reg) and unsigned(width_next) <= unsigned(endCol_reg)) then
+                    startY_next <= (others  => '0');
+                    endY_next <= std_logic_vector(unsigned(width_next) - unsigned(startCol_reg));
+                elsif(unsigned(width_next) > unsigned(endCol_reg)) then
+                    startY_next <= std_logic_vector(unsigned(width_next) - unsigned(endCol_reg));
+                    endY_next <=std_logic_vector(unsigned(width_next) - unsigned(startCol_reg));
                 else
+                    startY_next <= (others  => '0');
+                    endY_next <= "000" & letterHeight_next;
                     currX_next <= std_logic_vector(unsigned(currX_reg) + unsigned(letterWidth_next) + unsigned(spacing_reg));
                     k_next <= std_logic_vector(unsigned(k_reg) + TO_UNSIGNED(1, TEXT_RAM_WIDTH));
                     if(unsigned(k_next) = unsigned(end_reg)) then
@@ -510,25 +514,94 @@ begin
                         state_next <= K_LOOP;
                     end if;
                 end if;
-            elsif(TO_INTEGER(unsigned(tmp_currY_next)) >= TO_INTEGER(unsigned(startCol_reg))) then
-                if(TO_INTEGER(unsigned(tmp_currY_next)) + TO_INTEGER(unsigned(letterHeight_next)) > TO_INTEGER(unsigned(endCol_reg))) then
-                    startY_next <= std_logic_vector(unsigned(tmp_currY_next) + unsigned(letterHeight_next) - unsigned(endCol_reg));
+            elsif((unsigned(tmp_currY_next)) >= unsigned(startCol_reg)) then
+                if(unsigned(width_next) > unsigned(endCol_reg)) then
+                    startY_next <= std_logic_vector(unsigned(width_next) - unsigned(endCol_reg));
+                    endY_next <= "000" & letterHeight_next;
                 else
                     startY_next <= (others  => '0');
+                    endY_next <= "000" & letterHeight_next;
                 end if;
             else
                 startY_next <= (others  => '0');
-                endY_next <= letterHeight_next;
+                endY_next <= "000" & letterHeight_next;
             end if;
             i_next <= startY_next;
             
         when I_LOOP =>
             j_next <= (others => '0');
             rowIndex_next <= std_logic_vector(unsigned(letterHeight_reg) - to_unsigned(1,11) - unsigned(i_reg));
+            en_letterMatrix <= '1';
+            addr_letterMatrix_read <= std_logic_vector(unsigned(i_reg) * unsigned(letterWidth_reg) + unsigned(j_next) + unsigned(startPos_reg));
+            
             state_next <= J_LOOP;
-        
         when J_LOOP =>
+            if( unsigned(data_letterMatrix_in) = to_unsigned(1, LETTER_MATRIX_RAM_WIDTH)) then
+                en_photo <= '1';
+                addr_photo_write <= "000000" & i_reg;
+                data_photo_out <= std_logic_vector(to_unsigned(255,PHOTO_RAM_WIDTH));              
+                state_next <= J_LOOP2;
+            else
+                j_next <= std_logic_vector(unsigned(j_reg) + to_unsigned(1, 11));
+                if(unsigned(j_next) = unsigned(letterWidth_reg)) then
+                    i_next <= std_logic_vector(unsigned(i_reg) + to_unsigned(1, 11));
+                    if(unsigned(i_next) = unsigned(endY_reg)) then
+                        currX_next <= std_logic_vector(unsigned(currX_reg) + unsigned(letterWidth_next) + unsigned(spacing_reg));
+                        k_next <= std_logic_vector(unsigned(k_reg) + to_unsigned(1, 11));
+                        if(unsigned(k_next) = unsigned(end_reg)) then
+                            z_next <= std_logic_vector(unsigned(z_reg) + to_unsigned(1, 11));
+                            if(unsigned(z_next) = unsigned(number_rows_reg)) then
+                                state_next <= IDLE;
+                            else
+                                state_next <= Z_LOOP;
+                            end if;
+                        else
+                            state_next <= K_LOOP;
+                        end if;
+                    else
+                        state_next <= I_LOOP;
+                    end if;
+                else  
+                    state_next <= J_LOOP;
+                    en_letterMatrix <= '1';
+                    addr_letterMatrix_read <= std_logic_vector(unsigned(i_reg) * unsigned(letterWidth_reg) + unsigned(j_next) + unsigned(startPos_reg));
+                end if;
+            end if;
                 
+        when J_LOOP2 =>    
+            en_photo <= '1';
+            addr_photo_write <= std_logic_vector(unsigned("000000" & i_reg) + to_unsigned(1,18));
+            data_photo_out <= std_logic_vector(to_unsigned(255,PHOTO_RAM_WIDTH));              
+            state_next <= J_LOOP3;               
+                                            
+        when J_LOOP3 =>  
+            addr_photo_write <= std_logic_vector(unsigned("000000" & i_reg) + to_unsigned(2,18));
+            data_photo_out <= std_logic_vector(to_unsigned(255,PHOTO_RAM_WIDTH));
+            j_next <= std_logic_vector(unsigned(j_reg) + to_unsigned(1, 11));
+                if(unsigned(j_next) = unsigned(letterWidth_reg)) then
+                    i_next <= std_logic_vector(unsigned(i_reg) + to_unsigned(1, 11));
+                    if(unsigned(i_next) = unsigned(endY_reg)) then
+                        currX_next <= std_logic_vector(unsigned(currX_reg) + unsigned(letterWidth_next) + unsigned(spacing_reg));
+                        k_next <= std_logic_vector(unsigned(k_reg) + to_unsigned(1, 11));
+                        if(unsigned(k_next) = unsigned(end_reg)) then
+                            z_next <= std_logic_vector(unsigned(z_reg) + to_unsigned(1, 11));
+                            if(unsigned(z_next) = unsigned(number_rows_reg)) then
+                                state_next <= IDLE;
+                            else
+                                state_next <= Z_LOOP;
+                            end if;
+                        else
+                            state_next <= K_LOOP;
+                        end if;
+                    else
+                        state_next <= I_LOOP;
+                    end if;
+                else  
+                    state_next <= J_LOOP;
+                    en_letterMatrix <= '1';
+                    addr_letterMatrix_read <= std_logic_vector(unsigned(i_reg) * unsigned(letterWidth_reg) + unsigned(j_next) + unsigned(startPos_reg));
+                end if;
+                          
       
             
                 
