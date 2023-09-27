@@ -22,7 +22,7 @@ port (
   );
 end BRAM_2READ_PORTS;
 
-architecture rtl of BRAM_2READ_PORTS is
+architecture Behavioral of BRAM_2READ_PORTS is
   type ram_type is array (0 to RAM_DEPTH - 1) of std_logic_vector(RAM_WIDTH - 1 downto 0);
   signal memory : ram_type;
 begin
@@ -38,4 +38,4 @@ begin
       end if;
     end if;
   end process;
-end rtl;
+end Behavioral;

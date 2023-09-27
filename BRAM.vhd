@@ -9,17 +9,17 @@ generic (
       RAM_DEPTH : integer := 214;
       ADDR_SIZE : integer := 8);--based on RAM_DEPTH   ADDR_SIZE = log2(RAM_DEPTH);
 Port (  clk : in std_logic;                                     
- en : in std_logic;                                      
- we : in std_logic;                                      
- addr_read : in std_logic_vector(ADDR_SIZE-1  downto 0);                  
- addr_write : in std_logic_vector(ADDR_SIZE-1  downto 0);         
- data_in : in std_logic_vector(RAM_WIDTH - 1 downto 0);  
- data_out : out std_logic_vector(RAM_WIDTH - 1 downto 0));
+        en : in std_logic;                                      
+        we : in std_logic;                                      
+        addr_read : in std_logic_vector(ADDR_SIZE-1  downto 0);                  
+        addr_write : in std_logic_vector(ADDR_SIZE-1  downto 0);         
+        data_in : in std_logic_vector(RAM_WIDTH - 1 downto 0);  
+        data_out : out std_logic_vector(RAM_WIDTH - 1 downto 0));
 end BRAM;
 
 architecture Behavioral of BRAM is
  type ram_type is array (0 to RAM_DEPTH - 1) of std_logic_vector(RAM_WIDTH - 1 downto 0);
-  signal memory : ram_type;
+ signal memory : ram_type;
 begin
 process (clk)
   begin
