@@ -1,35 +1,6 @@
-----------------------------------------------------------------------------------
--- Company: 
--- Engineer: 
--- 
--- Create Date: 09/06/2023 04:06:31 PM
--- Design Name: 
--- Module Name: TOP_tb - Behavioral
--- Project Name: 
--- Target Devices: 
--- Tool Versions: 
--- Description: 
--- 
--- Dependencies: 
--- 
--- Revision:
--- Revision 0.01 - File Created
--- Additional Comments:
--- 
-----------------------------------------------------------------------------------
-
-
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
-
--- Uncomment the following library declaration if using
--- arithmetic functions with Signed or Unsigned values
 use IEEE.NUMERIC_STD.ALL;
-
--- Uncomment the following library declaration if instantiating
--- any Xilinx leaf cells in this code.
---library UNISIM;
---use UNISIM.VComponents.all;
 
 entity TOP_tb is
 generic (           
@@ -63,11 +34,15 @@ signal clk, reset, ready: std_logic;
 signal command: std_logic_vector(3 downto 0);
 signal axis_s_data_in:  std_logic_vector(AXI_WIDTH-1 downto 0);
 signal axis_s_valid, axis_s_last, axis_s_ready: std_logic;
+signal axim_s_data_out:  std_logic_vector(AXI_WIDTH-1 downto 0);
+signal axim_s_valid, axim_s_last, axim_s_ready: std_logic;
+signal possition_y : std_logic_vector(10 downto 0);
 begin
 
 tb: entity work.TOP
-  generic map(AXI_WIDTH=>AXI_WIDTH,
-              LETTER_DATA_RAM_WIDTH=>LETTER_DATA_RAM_WIDTH, 
+generic map(
+             AXI_WIDTH=>AXI_WIDTH,
+             LETTER_DATA_RAM_WIDTH=>LETTER_DATA_RAM_WIDTH, 
              LETTER_DATA_RAM_DEPTH=>LETTER_DATA_RAM_DEPTH,
              LETTER_DATA_ADDR_SIZE =>LETTER_DATA_ADDR_SIZE,
              LETTER_MATRIX_RAM_WIDTH=>LETTER_MATRIX_RAM_WIDTH, 
@@ -82,98 +57,158 @@ tb: entity work.TOP
              POSSITION_RAM_WIDTH => POSSITION_RAM_WIDTH,
              POSSITION_RAM_DEPTH => POSSITION_RAM_DEPTH,
              POSSITION_ADDR_SIZE => POSSITION_ADDR_SIZE)
- port map(clk => clk,
- command => command,
- reset => reset,
- ready => ready,                                     
- axis_s_data_in => axis_s_data_in,
-axis_s_valid => axis_s_valid,
-axis_s_last => axis_s_last,
-axis_s_ready => axis_s_ready
+ port map(
+             clk => clk,
+             command => command,
+             reset => reset,
+             ready => ready,                                     
+             axis_s_data_in => axis_s_data_in,
+             axis_s_valid => axis_s_valid,
+             axis_s_last => axis_s_last,
+             axis_s_ready => axis_s_ready,
+             possition_y => possition_y,
+             axim_s_data_out => axim_s_data_out,
+             axim_s_valid => axim_s_valid,
+             axim_s_last => axim_s_last,
+             axim_s_ready => axim_s_ready
  );
  
  clk_gen: process
  begin
-    clk <= '0', '1' after 10 ns;
-    wait for 20 ns;
+    clk <= '0', '1' after 5 ns;
+    wait for 10 ns;
  end process;
  
  stim_gen: process
+ variable i : integer := 0;
  begin
- reset<= '1';
- command <= "0000";
- wait for 40 ns;
- reset<= '0';
+    --reset
+    reset <= '1';
+    command <= "0000";
+    axis_s_data_in <= (others => '0');
+    axis_s_valid <= '0';
+    axis_s_last<= '0';
+    wait for 100 ns;
+    reset<= '0';
+    
+    wait for 10 ns;
+    
+    possition_y <= "00001101000";
  
- command <= "0001";
- wait for 30 ns;
- axis_s_valid <= '1';
- axis_s_last<= '0';
- for i in 0 to 213
- loop
- axis_s_data_in <= std_logic_vector(to_unsigned(1,AXI_WIDTH));
- wait for 20 ns;
- end loop;
- axis_s_last<= '1';
- 
- 
- command <= "0010";
- wait for 50 ns;
- axis_s_valid <= '1';
- axis_s_last<= '0';
- for i in 0 to 3999
- loop
- axis_s_data_in <= std_logic_vector(to_unsigned(0,AXI_WIDTH));
- wait for 20 ns;
- axis_s_data_in <= std_logic_vector(to_unsigned(0,AXI_WIDTH));
- wait for 20 ns;
- axis_s_data_in <= std_logic_vector(to_unsigned(1,AXI_WIDTH));
- wait for 20 ns;
- axis_s_data_in <= std_logic_vector(to_unsigned(1,AXI_WIDTH));
- wait for 20 ns;
- end loop;
- axis_s_last<= '1';
- 
- command <= "0011";
- wait for 30 ns;
- axis_s_valid <= '1';
- axis_s_last<= '0';
- for i in 0 to 99
- loop
- axis_s_data_in <= std_logic_vector(to_unsigned(10,AXI_WIDTH));
- wait for 20 ns;
- axis_s_data_in <= std_logic_vector(to_unsigned(5,AXI_WIDTH));
- wait for 20 ns;
- end loop;
- axis_s_last<= '1';
- command <= "0000";
- 
- command <= "0101";
- wait for 30 ns;
- axis_s_valid <= '1';
- axis_s_last<= '0';
- for i in 0 to 1000
- loop
- axis_s_data_in <= std_logic_vector(to_unsigned(5,AXI_WIDTH));
- wait for 20 ns;
- end loop;
- axis_s_last<= '1';
- command <= "0000";
- 
- command <= "0100";
- wait for 30 ns;
- axis_s_valid <= '1';
- axis_s_last<= '0';
- for i in 0 to 106
- loop
- axis_s_data_in <= std_logic_vector(to_unsigned(i*i,AXI_WIDTH));
- wait for 20 ns;
- end loop;
- axis_s_last<= '1';
- 
- wait;
- 
- 
+     --PUNJENJE LETTERDATA
+     command <= "0001";
+     while(i < 214) loop
+        if(i = 213) then
+            axis_s_last <= '1';
+            axis_s_data_in <= std_logic_vector(to_unsigned(0, AXI_WIDTH));
+            i := i + 1;
+        elsif(axis_s_ready = '1') then  
+            axis_s_valid <= '1';  
+            axis_s_data_in <= std_logic_vector(to_unsigned(10, AXI_WIDTH));
+            i := i + 1;
+        end if;
+        wait for 10ns;
+     end loop;
+     
+     command <= "0000";
+     axis_s_valid <= '0';
+     axis_s_last <= '0';
+     i := 0;
+     wait for 100 ns;
+     
+      --PUNJENJE TEXTA
+     command <= "0011";
+     while(i < 40) loop
+        if(i = 39) then
+            axis_s_last <= '1';
+        end if;
+        if(axis_s_ready = '1') then
+            axis_s_valid <= '1';
+            if(i = 0 or i = 20) then    
+                axis_s_data_in <= std_logic_vector(to_unsigned(255, AXI_WIDTH));
+            else 
+                axis_s_data_in <= std_logic_vector(to_unsigned(100, AXI_WIDTH));
+            end if;
+            
+            i := i + 1;
+        end if;
+        wait for 10ns;
+     end loop;
+     
+     command <= "0000";
+     axis_s_valid <= '0';
+     axis_s_last <= '0';
+     i := 0;
+     wait for 100 ns;
+     
+    --PUNJENJE POSSITION
+     command <= "0100";
+     while(i < 106) loop
+        if(i = 105) then
+            axis_s_last <= '1';
+        end if;
+        if(axis_s_ready = '1') then  
+            axis_s_valid <= '1';  
+            axis_s_data_in <= std_logic_vector(to_unsigned(i, AXI_WIDTH));
+            i := i + 1;
+        end if;
+        wait for 10ns;
+     end loop;
+     
+--     command <= "0000";
+--     axis_s_valid <= '0';
+--     axis_s_last <= '0';
+--     i := 0;
+--     wait for 100 ns;
+     
+--     --PUNJENJE LETTERMATRIX
+--     command <= "0010";
+--     while(i < 1000) loop
+--        if(i = 999) then
+--            axis_s_last <= '1';
+--        end if;
+--        if(axis_s_ready = '1') then 
+--            axis_s_valid <= '1';   
+--            axis_s_data_in <= std_logic_vector(to_unsigned(i, AXI_WIDTH));
+--            i := i + 1;
+--        end if;
+--        wait for 10ns;
+--     end loop;
+     
+--     command <= "0000";
+--     axis_s_valid <= '0';
+--     axis_s_last <= '0';
+--     i := 0;
+--     wait for 100 ns;
+     
+--     --PUNJENJE DELA SLIKE
+--     command <= "0101";
+--     while(i < 1000) loop
+--        if(i = 999) then
+--            axis_s_last <= '1';
+--        end if;
+--        if(axis_s_ready = '1') then 
+--            axis_s_valid <= '1';   
+--            axis_s_data_in <= std_logic_vector(to_unsigned(i, AXI_WIDTH));
+--            i := i + 1;
+--        end if;
+--        wait for 10ns;
+--     end loop;
+     
+--     command <= "0000";
+--     axis_s_valid <= '0';
+--     axis_s_last <= '0';
+--     i := 0;
+--     wait for 100 ns;
+    
+    command <= "0110";
+    
+    wait for 10ns;
+    command <= "0000";
+    
+
+     wait;
+     
  end process;
 
 

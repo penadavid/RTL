@@ -33,6 +33,8 @@ Port (
       reset: in std_logic;
       ready: out std_logic;
       possition_y: in std_logic_vector(10 downto 0);
+      frame_finished_out: out std_logic;
+      section_finished_out: out std_logic;
       
       --letterData
       en_letterData, we_letterData: out std_logic;
@@ -75,11 +77,17 @@ Port (
       axis_s_data_in: in std_logic_vector(AXI_WIDTH - 1 downto 0);
       axis_s_valid:in std_logic;
       axis_s_last:in std_logic;
-      axis_s_ready:out std_logic );
+      axis_s_ready:out std_logic;
+      
+      --AXI_MASTER_STREAM signals
+      axim_s_data_out: out std_logic_vector(AXI_WIDTH - 1 downto 0);
+      axim_s_valid:out std_logic;
+      axim_s_last:out std_logic;
+      axim_s_ready: in std_logic );
 end BRAM_LOGIC;
 
 architecture Behavioral of BRAM_LOGIC is
-type state is (IDLE, LOAD_BRAMS, RESET_CHARACTER_REGS, PROCESSING, Z_LOOP, GET_STRING_WIDTH_1, GET_STRING_WIDTH_2, CURRENT_Y_X, CURRENT_Y_X_2, CURRENT_Y_X_3, K_LOOP, K_LOOP_2, K_LOOP_3, K_LOOP_4, I_LOOP, I_LOOP_2, J_LOOP, J_LOOP_2, J_LOOP_WRITE_1, J_LOOP_WRITE_2, J_LOOP_WRITE_3);
+type state is (IDLE, LOAD_BRAMS, RESET_CHARACTER_REGS, PROCESSING, Z_LOOP, GET_STRING_WIDTH_1, GET_STRING_WIDTH_2, CURRENT_Y_X, CURRENT_Y_X_2, CURRENT_Y_X_3, K_LOOP, K_LOOP_2, K_LOOP_3, K_LOOP_4, I_LOOP, I_LOOP_2, J_LOOP, J_LOOP_2, J_LOOP_WRITE_1, J_LOOP_WRITE_2, J_LOOP_WRITE_3, END_OF_PROCESSING, READ_PHOTO_DATA);
 signal state_reg, state_next: state;
 
 signal addr_reg, addr_next: std_logic_vector(PHOTO_ADDR_SIZE - 1  downto 0); 
@@ -161,6 +169,7 @@ signal i_loop_reg, i_loop_next: std_logic_vector(15 downto 0);
 --pomocni registar potreban za izracunavanje idx
 signal tmp_idx_reg, tmp_idx_next: std_logic_vector(17 downto 0);
 signal j_loop_reg, j_loop_next: std_logic_vector(11 downto 0);
+signal current_photo_data_adr_reg, current_photo_data_adr_next: std_logic_vector(PHOTO_ADDR_SIZE - 1 downto 0);
 --signal temp: std_logic_vector(21 downto 0);
 --signal temp_reg, temp_next: std_logic_vector(15 downto 0);
 
@@ -206,6 +215,7 @@ begin
         i_loop_reg <= (others => '0');
         tmp_idx_reg <= (others => '0');
         j_loop_reg <= (others => '0');
+        current_photo_data_adr_reg <= (others => '0');
         --temp_reg <= (others => '0');
         --command_reg <= (others =>'0');
     elsif rising_edge(clk) then
@@ -247,19 +257,25 @@ begin
         i_loop_reg <= i_loop_next;
         tmp_idx_reg <= tmp_idx_next;
         j_loop_reg <= j_loop_next;
-        --temp_reg <= temp_next;
+        current_photo_data_adr_reg <= current_photo_data_adr_next;
+       --temp_reg <= temp_next;
        -- command_reg<=command_next;
     end if;   
 end process;
 
-process(state_reg, addr_reg, command, frame_width_reg, frame_height_reg, bram_row_reg, axis_s_valid, axis_s_last, axis_s_data_in, number_character_reg, number_rows_reg, 
+process(state_reg, addr_reg, command, frame_width_reg, frame_height_reg, bram_row_reg, axis_s_valid, axis_s_last, axis_s_data_in,axim_s_ready, number_character_reg, number_rows_reg, 
 number_character_row1_reg, number_character_row2_reg, number_character_row3_reg, number_character_row4_reg, number_rows_next, spacing_reg, y_reg, endCol_reg, endCol_next, startCol_reg, z_reg, z_next, start_reg, end_reg, start_next, possition_y, 
 k_reg, k_next, width_reg, currX_reg, currY_reg, currY_next, data_text_in, data_letterData_in1, data_letterData_in2, 
-data_possition_in, data_letterMatrix_in, letterWidth_reg, letterWidth_next, letterHeight_reg, letterHeight_next, ascii_reg, 
+data_possition_in, data_letterMatrix_in,data_photo_in, letterWidth_reg, letterWidth_next, letterHeight_reg, letterHeight_next, ascii_reg, 
 ascii_next, startPos_reg, tmp_currY_reg, tmp_currY_next, startY_reg, startY_next, endY_reg,i_reg, i_next, j_reg, j_next, idx_reg, idx_next, rowIndex_next, rowIndex_reg, output_neg_adder1_s, output_neg_adder2_s, output_adder1_s, output_adder2_s, output_mul1_s, k_loop_reg, width_spacing_reg, i_loop_reg, tmp_idx_reg, j_loop_reg)
 begin
     ready <= '0';
     axis_s_ready <= '0';
+    frame_finished_out <= '0';
+    section_finished_out <= '0';
+    --axi master
+    axim_s_valid<='0';
+    axim_s_last<='0';
 
     addr_next<= addr_reg;
     frame_width_next <= frame_width_reg;
@@ -350,6 +366,7 @@ begin
     j_next <= j_reg;
     rowIndex_next <= rowIndex_reg;
     idx_next <= idx_reg;
+    current_photo_data_adr_next <= current_photo_data_adr_reg;
     --temp_next <= temp_reg;
     
     k_loop_next <= (others => '0');
@@ -467,6 +484,9 @@ begin
             
             
         when PROCESSING =>
+        -- za read photo potrebno resetovati adres registar
+            addr_next <= (others => '0');
+        ------------------------------------------
             y_next <= data_letterData_in1;          
             endCol_next <= possition_y;
             --oduzimamo pomocu komponente koja se mapira na dsp
@@ -565,14 +585,14 @@ begin
             if(unsigned(currY_reg) >= unsigned(endCol_reg)) then
                 z_next <= std_logic_vector(unsigned(z_reg) + TO_UNSIGNED(1, 3));
                 if(z_next = number_rows_reg) then
-                    state_next <= IDLE;    
+                    state_next <= END_OF_PROCESSING;    
                 else
                     state_next <= Z_LOOP;
                 end if;
             elsif(unsigned(output_adder1_s) <= unsigned(startCol_reg)) then
                 z_next <= std_logic_vector(unsigned(z_reg) + TO_UNSIGNED(1, 3));
                 if(unsigned(z_next) = unsigned(number_rows_reg)) then
-                    state_next <= IDLE;    
+                    state_next <= END_OF_PROCESSING;    
                 else
                     state_next <= Z_LOOP;
                 end if;
@@ -677,7 +697,7 @@ begin
                     if(unsigned(k_next) = unsigned(end_reg)) then
                         z_next <= std_logic_vector(unsigned(z_reg) + TO_UNSIGNED(1, 3));
                         if(unsigned(z_next) = unsigned(number_rows_reg)) then
-                            state_next <= IDLE;    
+                            state_next <= END_OF_PROCESSING;    
                         else
                             state_next <= Z_LOOP;
                         end if;                       
@@ -773,7 +793,7 @@ begin
                         if(unsigned(k_next) = unsigned(end_reg)) then
                            z_next <= std_logic_vector(unsigned(z_reg) + to_unsigned(1, 3));
                             if(unsigned(z_next) = unsigned(number_rows_reg)) then
-                                state_next <= IDLE;
+                                state_next <= END_OF_PROCESSING;
                             else
                                 state_next <= Z_LOOP;
                             end if;
@@ -845,7 +865,7 @@ begin
                         if(unsigned(k_next) = unsigned(end_reg)) then
                            z_next <= std_logic_vector(unsigned(z_reg) + to_unsigned(1, 3));
                             if(unsigned(z_next) = unsigned(number_rows_reg)) then
-                                state_next <= IDLE;
+                                state_next <= END_OF_PROCESSING;
                             else
                                 state_next <= Z_LOOP;
                             end if;
@@ -865,9 +885,47 @@ begin
                     
                     state_next <= J_LOOP;
                 end if;
-                        
+                
+        when END_OF_PROCESSING =>   
+            en_adder1_s <= '1';
+            input1_adder1_s <= currY_reg;
+            input2_adder1_s <= "000" & y_reg;
+            
+            if(unsigned(output_adder1_s) <= unsigned(endCol_reg)) then
+                frame_finished_out <= '1';
+            else
+                section_finished_out <= '1';
+            end if;
+            
+            -- za read photo potrebno resetovati adres registar
+            addr_next <= (others => '0');
+            ------------------------------------------
+            state_next <= READ_PHOTO_DATA;
+            
+        when READ_PHOTO_DATA =>
+            
+            if(unsigned(addr_reg) < to_unsigned(PHOTO_RAM_DEPTH,18)) then
+                state_next<=READ_PHOTO_DATA;
+            else
+                if(axim_s_ready = '1') then
+                    state_next <= IDLE;
+                    axim_s_last <= '1';
+                else 
+                    state_next<=READ_PHOTO_DATA;
+                    axim_s_last <= '1';
+                end if;
+            end if;
+            
+            axim_s_valid<='1';
+            if(axim_s_ready = '1') then
+                addr_photo_read <= addr_reg;
+                addr_next <= std_logic_vector(UNSIGNED(addr_reg)+to_unsigned(1,PHOTO_ADDR_SIZE));    
+            end if;      
+                            
     end case;
-
+    -- povezujemo direktno axi master sa ulazom iz photo brama koji smo povezali sa photo bramom u DATA_BRAM-u
+    axim_s_data_out <= "00000000" & data_photo_in;
+    ---------------------------------------
     data_letterData_out <= axis_s_data_in(LETTER_DATA_RAM_WIDTH - 1 downto 0);
     data_letterMatrix_out <= axis_s_data_in(LETTER_MATRIX_RAM_WIDTH - 1 downto 0);
     data_possition_out <= axis_s_data_in(POSSITION_RAM_WIDTH - 1 downto 0);

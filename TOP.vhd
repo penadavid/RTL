@@ -30,11 +30,20 @@ Port (
       command: in std_logic_vector(3 downto 0);
       reset: in std_logic;
       ready: out std_logic;
+      --axi slave
       axis_s_data_in: in std_logic_vector(AXI_WIDTH-1 downto 0);
       axis_s_valid:in std_logic;
       axis_s_last:in std_logic;
       axis_s_ready:out std_logic;
-      possition_y: in std_logic_vector(10 downto 0));
+      --axi master
+      axim_s_data_out: out std_logic_vector(AXI_WIDTH - 1 downto 0);
+      axim_s_valid:out std_logic;
+      axim_s_last:out std_logic;
+      axim_s_ready: in std_logic;
+      
+      possition_y: in std_logic_vector(10 downto 0);
+      frame_finished_out: out std_logic;
+      section_finished_out: out std_logic);
 end TOP;
 
 architecture Behavioral of TOP is
@@ -96,7 +105,9 @@ port map(clk => clk,
          command => command,
          reset => reset,
          ready => ready,
-         possition_y => possition_y,                    
+         possition_y => possition_y,
+         frame_finished_out => frame_finished_out,
+         section_finished_out => section_finished_out,                    
                   
          en_letterData => en_letterData_s,                                     
          we_letterData => we_letterData_s,                                     
@@ -138,7 +149,12 @@ port map(clk => clk,
          axis_s_data_in => axis_s_data_in,
          axis_s_valid => axis_s_valid,
          axis_s_last => axis_s_last,
-         axis_s_ready => axis_s_ready);
+         axis_s_ready => axis_s_ready,
+         
+         axim_s_data_out => axim_s_data_out,
+         axim_s_valid => axim_s_valid,
+         axim_s_last => axim_s_last,
+         axim_s_ready => axim_s_ready);
          
 data_bram: entity work.DATA_BRAM
 generic map(AXI_WIDTH=>AXI_WIDTH,

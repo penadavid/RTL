@@ -10,7 +10,7 @@ entity adder is
         input_1 : in std_logic_vector(WIDTH - 1 downto 0);
         input_2 : in std_logic_vector(WIDTH - 1 downto 0);
         en : in std_logic;
-        output : out std_logic_vector(WIDTH - 1 + 1 downto 0)
+        output : out std_logic_vector(WIDTH downto 0)
          );
 end adder;
 
@@ -24,7 +24,7 @@ begin
     if (en = '0') then
         output <= (others => '0');
     else        
-        output <= std_logic_vector(unsigned(input_1) + unsigned(input_2));
+        output <= std_logic_vector(unsigned('0' & input_1) + unsigned('0' & input_2));
     end if;
 
 end process;
