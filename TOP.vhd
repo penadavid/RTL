@@ -27,7 +27,7 @@ generic (
       POSSITION_ADDR_SIZE : integer := 7);
 Port ( 
       clk: in std_logic;
-      command: in std_logic_vector(3 downto 0);
+      command: in std_logic_vector(7 downto 0);
       reset: in std_logic;
       ready: out std_logic;
       --axi slave
@@ -42,8 +42,8 @@ Port (
       axim_s_ready: in std_logic;
       
       possition_y: in std_logic_vector(10 downto 0);
-      frame_finished_out: out std_logic;
-      section_finished_out: out std_logic);
+      frame_finished_interrupt: out std_logic;
+      command_finished_interrupt: out std_logic);
 end TOP;
 
 architecture Behavioral of TOP is
@@ -106,8 +106,8 @@ port map(clk => clk,
          reset => reset,
          ready => ready,
          possition_y => possition_y,
-         frame_finished_out => frame_finished_out,
-         section_finished_out => section_finished_out,                    
+         frame_finished_interrupt => frame_finished_interrupt,
+         command_finished_interrupt => command_finished_interrupt,                    
                   
          en_letterData => en_letterData_s,                                     
          we_letterData => we_letterData_s,                                     
@@ -144,14 +144,13 @@ port map(clk => clk,
          addr_photo_write => addr_photo_write_s,
          addr_photo_read => addr_photo_read_s,                      
          data_photo_out => data_photo_out_s,
-         data_photo_in => data_photo_in_s,
+         
  
          axis_s_data_in => axis_s_data_in,
          axis_s_valid => axis_s_valid,
          axis_s_last => axis_s_last,
          axis_s_ready => axis_s_ready,
          
-         axim_s_data_out => axim_s_data_out,
          axim_s_valid => axim_s_valid,
          axim_s_last => axim_s_last,
          axim_s_ready => axim_s_ready);
@@ -202,7 +201,7 @@ port map(clk => clk,
          addr_photo_read => addr_photo_read_s,                
          addr_photo_write => addr_photo_write_s,      
          data_photo_in => data_photo_out_s, 
-         data_photo_out => data_photo_in_s,
+         data_photo_out =>   axim_s_data_out(7 downto 0),
          
          en_text => en_text_s,                                     
          we_text => we_text_s,                                     
@@ -210,5 +209,7 @@ port map(clk => clk,
          addr_text_write => addr_text_write_s,      
          data_text_in => data_text_out_s, 
          data_text_out => data_text_in_s);
+         
+         axim_s_data_out(15 downto 8) <= "00000000";
 
 end Behavioral;

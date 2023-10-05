@@ -31,12 +31,14 @@ end TOP_tb;
 
 architecture Behavioral of TOP_tb is
 signal clk, reset, ready: std_logic;
-signal command: std_logic_vector(3 downto 0);
+signal command: std_logic_vector(7 downto 0);
 signal axis_s_data_in:  std_logic_vector(AXI_WIDTH-1 downto 0);
 signal axis_s_valid, axis_s_last, axis_s_ready: std_logic;
 signal axim_s_data_out:  std_logic_vector(AXI_WIDTH-1 downto 0);
 signal axim_s_valid, axim_s_last, axim_s_ready: std_logic;
 signal possition_y : std_logic_vector(10 downto 0);
+signal frame_finished_interrupt: std_logic;
+signal command_finished_interrupt: std_logic;
 begin
 
 tb: entity work.TOP
@@ -70,7 +72,9 @@ generic map(
              axim_s_data_out => axim_s_data_out,
              axim_s_valid => axim_s_valid,
              axim_s_last => axim_s_last,
-             axim_s_ready => axim_s_ready
+             axim_s_ready => axim_s_ready,
+             frame_finished_interrupt => frame_finished_interrupt,
+             command_finished_interrupt => command_finished_interrupt
  );
  
  clk_gen: process
@@ -79,24 +83,26 @@ generic map(
     wait for 10 ns;
  end process;
  
+ 
+ 
  stim_gen: process
  variable i : integer := 0;
  begin
     --reset
     reset <= '1';
-    command <= "0000";
+    command <= "00000000";
     axis_s_data_in <= (others => '0');
     axis_s_valid <= '0';
-    axis_s_last<= '0';
+    axis_s_last <= '0';
     wait for 100 ns;
-    reset<= '0';
+    reset <= '0';
     
     wait for 10 ns;
     
     possition_y <= "00001101000";
  
      --PUNJENJE LETTERDATA
-     command <= "0001";
+     command <= "00000001";
      while(i < 214) loop
         if(i = 213) then
             axis_s_last <= '1';
@@ -110,14 +116,14 @@ generic map(
         wait for 10ns;
      end loop;
      
-     command <= "0000";
+     command <= "00000000";
      axis_s_valid <= '0';
      axis_s_last <= '0';
      i := 0;
      wait for 100 ns;
      
       --PUNJENJE TEXTA
-     command <= "0011";
+     command <= "00000100";
      while(i < 40) loop
         if(i = 39) then
             axis_s_last <= '1';
@@ -135,14 +141,14 @@ generic map(
         wait for 10ns;
      end loop;
      
-     command <= "0000";
+     command <= "00000000";
      axis_s_valid <= '0';
      axis_s_last <= '0';
      i := 0;
      wait for 100 ns;
      
     --PUNJENJE POSSITION
-     command <= "0100";
+     command <= "00001000";
      while(i < 106) loop
         if(i = 105) then
             axis_s_last <= '1';
@@ -155,61 +161,65 @@ generic map(
         wait for 10ns;
      end loop;
      
---     command <= "0000";
---     axis_s_valid <= '0';
---     axis_s_last <= '0';
---     i := 0;
---     wait for 100 ns;
+     command <= "00000000";
+     axis_s_valid <= '0';
+     axis_s_last <= '0';
+     i := 0;
+     wait for 100 ns;
      
---     --PUNJENJE LETTERMATRIX
---     command <= "0010";
---     while(i < 1000) loop
---        if(i = 999) then
---            axis_s_last <= '1';
---        end if;
---        if(axis_s_ready = '1') then 
---            axis_s_valid <= '1';   
---            axis_s_data_in <= std_logic_vector(to_unsigned(i, AXI_WIDTH));
---            i := i + 1;
---        end if;
---        wait for 10ns;
---     end loop;
+     --PUNJENJE LETTERMATRIX
+     command <= "00000010";
+     while(i < 1000) loop
+        if(i = 999) then
+            axis_s_last <= '1';
+        end if;
+        if(axis_s_ready = '1') then 
+            axis_s_valid <= '1';   
+            axis_s_data_in <= std_logic_vector(to_unsigned(i, AXI_WIDTH));
+            i := i + 1;
+        end if;
+        wait for 10ns;
+     end loop;
      
---     command <= "0000";
---     axis_s_valid <= '0';
---     axis_s_last <= '0';
---     i := 0;
---     wait for 100 ns;
+     command <= "00000000";
+     axis_s_valid <= '0';
+     axis_s_last <= '0';
+     i := 0;
+     wait for 100 ns;
      
---     --PUNJENJE DELA SLIKE
---     command <= "0101";
---     while(i < 1000) loop
---        if(i = 999) then
---            axis_s_last <= '1';
---        end if;
---        if(axis_s_ready = '1') then 
---            axis_s_valid <= '1';   
---            axis_s_data_in <= std_logic_vector(to_unsigned(i, AXI_WIDTH));
---            i := i + 1;
---        end if;
---        wait for 10ns;
---     end loop;
+     --PUNJENJE DELA SLIKE
+     command <= "00010000";
+     while(i < 1000) loop
+        if(i = 999) then
+            axis_s_last <= '1';
+        end if;
+        if(axis_s_ready = '1') then 
+            axis_s_valid <= '1';   
+            axis_s_data_in <= std_logic_vector(to_unsigned(i, AXI_WIDTH));
+            i := i + 1;
+        end if;
+        wait for 10ns;
+     end loop;
      
---     command <= "0000";
---     axis_s_valid <= '0';
---     axis_s_last <= '0';
---     i := 0;
---     wait for 100 ns;
+     command <= "00000000";
+     axis_s_valid <= '0';
+     axis_s_last <= '0';
+     i := 0;
+     wait for 100 ns;
     
-    command <= "0110";
-    
-    wait for 10ns;
-    command <= "0000";
-    
+    command <= "00100000";
+    axim_s_ready <= '1';
+    wait until falling_edge(command_finished_interrupt);
+    wait for 10 ns;
+    axim_s_ready <= '0';
+    command <= "00000000";
 
      wait;
-     
+         
  end process;
+ 
+ 
+ 
 
 
 end Behavioral;
